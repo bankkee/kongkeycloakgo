@@ -1,0 +1,105 @@
+version: '3.9'
+
+x-kong-config: &kong-env
+  KONG_DATABASE: ${KONG_DATABASE:-postgres}
+  KONG_PG_DATABASE: ${KONG_PG_DATABASE:-kong}
+  KONG_PG_HOST: db
+  KONG_PG_USER: ${KONG_PG_USER:-kong}
+  KONG_PG_PASSWORD: ${KONG_PG_PASSWORD:-kong}
+
+volumes:
+  kong_data: {}
+
+networks:
+  kong-net:
+    external: false
+
+services:
+  kong-migrations:
+    image: "${KONG_DOCKER_TAG:-kong:3.6.1-ubuntu}"
+    command: kong migrations bootstrap
+    depends_on:
+      - db
+    environment:
+      <<: *kong-env
+    networks:
+      - kong-net
+    restart: on-failure
+
+  kong-migrations-up:
+    image: "${KONG_DOCKER_TAG:-kong:3.6.1-ubuntu}"
+    command: kong migrations up && kong migrations finish
+    depends_on:
+      - db
+    environment:
+      <<: *kong-env
+    networks:
+      - kong-net
+    restart: on-failure
+
+  kong:
+    image: "${KONG_DOCKER_TAG:-kong-custom:1.0.0}"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "${KONG_USER:-kong}"
+    environment:
+      <<: *kong-env
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PROXY_LISTEN: "${KONG_PROXY_LISTEN:-0.0.0.0:8000}"
+      KONG_ADMIN_LISTEN: "${KONG_ADMIN_LISTEN:-0.0.0.0:8001}"
+      KONG_ADMIN_GUI_LISTEN: "${KONG_ADMIN_GUI_LISTEN:-0.0.0.0:8002}"
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD:-kong}
+      KONG_PLUGINS: bundled,authd
+      KONG_PLUGINSERVER_NAMES: authd
+      KONG_LOG_LEVEL: info
+      KONG_PLUGINSERVER_SOCKET: /usr/local/kong/authd.socket
+      KONG_PLUGINSERVER_AUTHD_START_CMD: /kong/authd
+      KONG_PLUGINSERVER_AUTHD_QUERY_CMD: /kong/authd -dump
+    networks:
+      - kong-net
+    ports:
+      - "${KONG_INBOUND_PROXY_LISTEN:-0.0.0.0}:8000:8000/tcp"
+      - "${KONG_INBOUND_SSL_PROXY_LISTEN:-0.0.0.0}:8443:8443/tcp"
+      - "8001:8001/tcp"
+      - "8444:8444/tcp"
+      - "8002:8002/tcp"
+    healthcheck:
+      test: [ "CMD", "kong", "health" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: on-failure
+    read_only: false
+    security_opt:
+      - no-new-privileges
+
+  db:
+    image: postgres:9.5
+    environment:
+      POSTGRES_DB: ${KONG_PG_DATABASE:-kong}
+      POSTGRES_USER: ${KONG_PG_USER:-kong}
+      POSTGRES_PASSWORD: ${KONG_PG_PASSWORD:-kong}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "-d",
+          "${KONG_PG_DATABASE:-kong}",
+          "-U",
+          "${KONG_PG_USER:-kong}"
+        ]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    restart: on-failure
+    stdin_open: true
+    tty: true
+    networks:
+      - kong-net
+    volumes:
+      - kong_data:/var/lib/postgresql/data

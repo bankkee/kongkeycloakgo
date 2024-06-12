@@ -1,0 +1,4 @@
+go-resource/config/*
+go-resource/data/*
+
+keycloak/data/

@@ -1,4 +1,5 @@
-go-resource/config/*
-go-resource/data/*
+go-resource/config/
+go-resource/data/
 
 keycloak/data/
+

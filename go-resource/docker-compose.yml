@@ -18,3 +18,5 @@ services:
       - "9999:9999"
     environment:
       - PORT=9999
+    depends_on:
+      - redis

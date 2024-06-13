@@ -53,9 +53,10 @@ services:
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_PG_PASSWORD: ${KONG_PG_PASSWORD:-kong}
+      KONG_LOG_LEVEL: info
+      #env for custom plugin
       KONG_PLUGINS: bundled,authd
       KONG_PLUGINSERVER_NAMES: authd
-      KONG_LOG_LEVEL: info
       KONG_PLUGINSERVER_SOCKET: /usr/local/kong/authd.socket
       KONG_PLUGINSERVER_AUTHD_START_CMD: /kong/authd
       KONG_PLUGINSERVER_AUTHD_QUERY_CMD: /kong/authd -dump

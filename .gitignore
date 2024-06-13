@@ -1,5 +1,7 @@
 go-resource/config/
-go-resource/data/
+go-resource/data/*
+go-resource/dump.rdb
 
 keycloak/data/
 
+kong/dump.rdb

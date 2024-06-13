@@ -39,6 +39,7 @@ require (
 require (
 	github.com/Nerzal/gocloak/v11 v11.2.0
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 )

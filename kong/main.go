@@ -1,14 +1,12 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 
 	"github.com/Kong/go-pdk"
 	"github.com/Kong/go-pdk/server"
-	"github.com/Nerzal/gocloak/v11"
 	"github.com/go-redis/redis"
 )
 
@@ -45,13 +43,34 @@ func (conf *Config) Access(kong *pdk.PDK) {
 	}
 }
 
-func verifyHandler(token string) (statusCode int, body []byte, err error) {
-	var realm = "my-demo"
-	var clientID = "test-secret-auth"
-	var clientSecret = "lq5FbPOisF1mpdCcmKQ3J4PbbhV2HJdy"
+// func verifyHandlerKeycloak(token string) (statusCode int, body []byte, err error) {
+// 	var realm = "my-demo"
+// 	var clientID = "test-secret-auth"
+// 	var clientSecret = "lq5FbPOisF1mpdCcmKQ3J4PbbhV2HJdy"
 
+// 	client := gocloak.NewClient("http://192.168.0.128:8080/", gocloak.SetAuthAdminRealms("admin/realms"), gocloak.SetAuthRealms("realms"))
+
+// 	// ตรวจสอบ token และรับผลลัพธ์จากการตรวจสอบ
+
+// 	result, err := client.RetrospectToken(context.Background(), token, clientID, clientSecret, realm)
+// 	log.Printf("Token validation result: %v", result)
+// 	if err != nil || !*result.Active {
+// 		log.Printf("Token validation failed: %v", err)
+// 		return http.StatusUnauthorized, []byte(`{"error": "Invalid token"}`), err
+// 	}
+
+// 	// สร้างข้อมูล JSON กลับเพื่อตอบกลับ
+// 	respJSON := map[string]string{"message": "Token is valid"}
+// 	response, err := json.Marshal(respJSON)
+// 	if err != nil {
+// 		return http.StatusInternalServerError, nil, err
+// 	}
+
+// 	return http.StatusOK, response, nil
+// }
+
+func verifyHandlerRedis(token string) (statusCode int, body []byte, err error) {
 	tokenExists, err := checkTokenInRedis(token)
-	log.Printf("Token exists in Redis: %v", tokenExists)
 	if err != nil {
 		log.Printf("Failed to check token in Redis: %v", err)
 		return http.StatusInternalServerError, nil, err
@@ -66,26 +85,8 @@ func verifyHandler(token string) (statusCode int, body []byte, err error) {
 		return http.StatusOK, response, nil
 	}
 
-	// check redis before
-	client := gocloak.NewClient("http://192.168.0.128:8080/", gocloak.SetAuthAdminRealms("admin/realms"), gocloak.SetAuthRealms("realms"))
-
-	// ตรวจสอบ token และรับผลลัพธ์จากการตรวจสอบ
-
-	result, err := client.RetrospectToken(context.Background(), token, clientID, clientSecret, realm)
-	log.Printf("Token validation result: %v", result)
-	if err != nil || !*result.Active {
-		log.Printf("Token validation failed: %v", err)
-		return http.StatusUnauthorized, []byte(`{"error": "Invalid token"}`), err
-	}
-
-	// สร้างข้อมูล JSON กลับเพื่อตอบกลับ
-	respJSON := map[string]string{"message": "Token is valid"}
-	response, err := json.Marshal(respJSON)
-	if err != nil {
-		return http.StatusInternalServerError, nil, err
-	}
-
-	return http.StatusOK, response, nil
+	// Token not found in Redis, return unauthorized error
+	return http.StatusUnauthorized, []byte(`{"error": "Invalid token"}`), nil
 }
 
 func checkTokenInRedis(token string) (bool, error) {
@@ -102,7 +103,7 @@ func checkTokenInRedis(token string) (bool, error) {
 }
 
 func callAuthServer(token string) (statusCode int, body []byte, err error) {
-	statusCode, body, err = verifyHandler(token)
+	statusCode, body, err = verifyHandlerRedis(token)
 	if err != nil {
 		return statusCode, body, err
 	}

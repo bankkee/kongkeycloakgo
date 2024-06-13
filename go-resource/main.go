@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/Nerzal/gocloak/v11"
 	"github.com/gin-gonic/gin"
@@ -36,6 +37,25 @@ func main() {
 
 	router.POST("/login", loginHandler)
 
+	// ticker := time.NewTicker(1 * time.Second)
+	// defer ticker.Stop()
+
+	// go func() {
+	// 	for range ticker.C {
+	// 		log.Println("Logging keys in Redis:")
+	// 		iter := rdb.Scan(0, "*", 0).Iterator()
+	// 		for iter.Next() {
+	// 			key := iter.Val()
+	// 			value, _ := rdb.Get(key).Result()
+	// 			log.Printf("- Key: %s value: %s\n", key, value)
+	// 		}
+	// 		if err := iter.Err(); err != nil {
+	// 			log.Printf("Error scanning keys: %v", err)
+	// 		}
+	// 		log.Println("End of keys list")
+	// 	}
+	// }()
+
 	// เริ่มเซิร์ฟเวอร์
 	if err := router.Run(":9999"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
@@ -54,6 +74,7 @@ func loginHandler(c *gin.Context) {
 	client := gocloak.NewClient("http://192.168.0.128:8080/", gocloak.SetAuthAdminRealms("admin/realms"), gocloak.SetAuthRealms("realms"))
 
 	token, err := client.Login(context.Background(), clientID, clientSecret, realm, loginReq.Username, loginReq.Password)
+	log.Printf("Token: %v", token)
 	if err != nil {
 		log.Printf("Login failed: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
@@ -61,7 +82,7 @@ func loginHandler(c *gin.Context) {
 	}
 	log.Printf("Access token: %v", token.AccessToken)
 
-	if err := storeAccessToken("access_token", token.AccessToken); err != nil {
+	if err := storeAccessToken(loginReq.Username, token.AccessToken); err != nil {
 		log.Printf("Failed to store access token: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store access token"})
 		return
@@ -71,7 +92,7 @@ func loginHandler(c *gin.Context) {
 }
 
 func storeAccessToken(key string, token string) error {
-	err := rdb.RPush(key, token).Err()
+	err := rdb.Set(key, token, 30*time.Minute).Err()
 	log.Printf("storeAccessToken.error: %v", err)
 	return err
 }

@@ -73,14 +73,14 @@ func verifyHandlerRedis(token string) (statusCode int, body []byte, err error) {
 	tokenExists, err := checkTokenInRedis(token)
 	if err != nil {
 		log.Printf("Failed to check token in Redis: %v", err)
-		return http.StatusInternalServerError, nil, err
+		return http.StatusUnauthorized, []byte(`{"error": "Invalid token"}`), nil
 	}
 	if tokenExists {
 		// Token found in Redis, return success response immediately
 		respJSON := map[string]string{"message": "Token is valid"}
 		response, err := json.Marshal(respJSON)
 		if err != nil {
-			return http.StatusInternalServerError, nil, err
+			return http.StatusUnauthorized, []byte(`{"error": "Invalid token"}`), nil
 		}
 		return http.StatusOK, response, nil
 	}
@@ -89,16 +89,24 @@ func verifyHandlerRedis(token string) (statusCode int, body []byte, err error) {
 	return http.StatusUnauthorized, []byte(`{"error": "Invalid token"}`), nil
 }
 
-func checkTokenInRedis(token string) (bool, error) {
-	result, err := rdb.LRange("access_token", 0, -1).Result()
-	if err != nil {
-		return false, err
-	}
-	for _, t := range result {
-		if t == token {
+func checkTokenInRedis(valueToFind string) (bool, error) {
+
+	iter := rdb.Scan(0, "*", 0).Iterator()
+	for iter.Next() {
+		key := iter.Val()
+		value, err := rdb.Get(key).Result()
+
+		if err != nil && err != redis.Nil {
+			return false, err
+		}
+		if value == valueToFind {
 			return true, nil
 		}
 	}
+	if err := iter.Err(); err != nil {
+		return false, err
+	}
+
 	return false, nil
 }
 
